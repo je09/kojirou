@@ -178,7 +178,7 @@ func pathsToImages(
 					return nil
 				}
 				eg.Go(func() error {
-					image, err := getImage(httpClient, ctx, path.URL)
+					image, err := getImage(httpClient, ctx, path.URL, 0)
 					if err != nil {
 						defer cancel()
 						return fmt.Errorf("chapter %v: image %v: %w", path.ChapterIdentifier, path.ImageIdentifier, err)
@@ -203,7 +203,7 @@ func pathsToImages(
 	return ch, eg
 }
 
-func getImage(client *http.Client, ctx context.Context, url string) (image.Image, error) {
+func getImage(client *http.Client, ctx context.Context, url string, try uint) (image.Image, error) {
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("prepare: %w", err)
@@ -219,6 +219,10 @@ func getImage(client *http.Client, ctx context.Context, url string) (image.Image
 	}
 
 	img, _, err := image.Decode(resp.Body)
+	// Hack to fix broken images.
+	if img == nil && try <= 10 {
+		return getImage(client, ctx, url, try+1)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("decode: %w", err)
 	}
